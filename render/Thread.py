@@ -1,4 +1,4 @@
-from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtCore import QThread, pyqtSignal, QTimer
 import numpy as np
 from render.rendermode import Rendering_mode
 from pathlib import Path
@@ -18,8 +18,8 @@ class RenderThread(QThread):
     K = None # [3x3]
     point_min = None
     point_max = None
-    W = 1920
-    H = 1080
+    W = 860
+    H = 480
 
     def __init__(self, filename):
         super().__init__()
@@ -28,8 +28,9 @@ class RenderThread(QThread):
         self.running=True
         self.fx = 1659
         self.fy = 933
-        self.cx = 960
-        self.cy = 540
+        self.cx = self.W / 2
+        self.cy = self.H / 2
+        self.times = 0
 
     def parsing_file(self):
         # parsing file:
@@ -81,18 +82,18 @@ class RenderThread(QThread):
 
     def move_right(self, step=0.1):
         dir = self.R[0 , :]
-        self.T = -self.R @ (-self.R.T@self.T + step*dir)
+        self.T = -self.R @ (-self.R.T @ self.T + step * dir)
     def move_left(self, step=0.1):
         dir = self.R[0 , :]
-        self.T = -self.R @ (-self.R.T@self.T - step*dir)
+        self.T = -self.R @ (-self.R.T @ self.T - step * dir)
 
     def move_forward(self, step=0.1):
         dir = self.R[2 , :]
-        self.T = -self.R @ (-self.R.T@self.T + step*dir)
+        self.T = -self.R @ (-self.R.T @ self.T + step * dir)
 
     def move_back(self, step = 0.1):
         dir = self.R[2 , :]
-        self.T = -self.R @ (-self.R.T@self.T - step*dir)
+        self.T = -self.R @ (-self.R.T @ self.T - step * dir)
 
     def turn_left(self, step=math.pi/180):
         angle = step
@@ -120,10 +121,68 @@ class RenderThread(QThread):
         self.R = R_ @ self.R
         self.T = self.R @ (R.T @ self.T)
 
+    def turn_up(self, step=math.pi/180):
+        angle = step
+        c, s = np.cos(angle), np.sin(angle)
+        
+        R_ = np.array([
+            [1, 0, 0],
+            [0, c, -s],
+            [0, s, c]
+        ])
+        
+        R = self.R
+        self.R = R_ @ self.R
+        self.T = self.R @ (R.T @ self.T)
+
+    def turn_down(self, step=math.pi/180):
+        angle = step
+        c, s = np.cos(angle), np.sin(angle)
+        
+        R_ = np.array([
+            [1, 0, 0],
+            [0, c, s],
+            [0, -s, c]
+        ])
+        
+        R = self.R
+        self.R = R_ @ self.R
+        self.T = self.R @ (R.T @ self.T)
+
+    def rotate_in_dir(self, _2D_dir, step=math.pi/180):
+        _2D_dir = _2D_dir / np.linalg.norm(_2D_dir)
+        step1 = step * np.sign(_2D_dir[0])
+        step2 = step * np.sign(_2D_dir[1])
+        
+        c1, s1 = np.cos(step1), np.sin(step1)
+        c2, s2 = np.cos(step2), np.sin(step2)
+        
+        R1 = np.array([
+            [c1, 0, -s1],
+            [0, 1, 0],
+            [s1, 0, c1]
+        ])
+        R2 = np.array([
+            [1, 0, 0],
+            [0, c2, s2],
+            [0, -s2, c2]
+        ])
+        
+        R_ = R2 @ R1
+        
+        R = self.R
+        self.R = R_ @ R
+        self.T = self.R @ (R.T @ self.T)
+
     def run(self):
         self.parsing_file() # parsing the file first
         self.R, self.T = get_init_camera(self.point_min,self.point_max)
         while self.running:
+            if self.times < 10:
+                self.times += 1
+                continue
+            else:
+                self.times = 0
             # rendering cores:
             if self.rendering_mode is Rendering_mode.NONE:
                 pass
@@ -148,6 +207,29 @@ class RenderThread(QThread):
                 camera[0].idx.to(torch.device("cuda"))
                 camera[0].to_device(torch.device("cuda"))
                 render_pkg = self.renderer(camera[0], self.model, self.bg_color)
+                rgb = render_pkg['render']
+                self.frame_ready.emit(rgb.detach().cpu().numpy()*255)
+            if self.rendering_mode is Rendering_mode.CKPT_GS:
+                self.Rs[0] = torch.tensor(self.R,device=torch.device("cuda"))
+                self.Ts[0] = torch.tensor(self.T,device=torch.device("cuda"))
+                camera=Cameras(
+                    R=self.Rs,
+                    T=self.Ts,
+                    fx=self.fxs,
+                    fy=self.fys,
+                    cx=self.cxs,
+                    cy=self.cys,
+                    width=self.width,
+                    height=self.height,
+                    appearance_id=self.appearance_id,
+                    normalized_appearance_id=self.normalized_appearance_id,
+                    distortion_params=None,
+                    camera_type=self.camera_type
+                    )
+                camera = [camera[0]]
+                camera[0].idx.to(torch.device("cuda"))
+                camera[0].to_device(torch.device("cuda"))
+                render_pkg = self.renderer(camera[0], self.model, self.bg_color, render_ellips = True)
                 rgb = render_pkg['render']
                 self.frame_ready.emit(rgb.detach().cpu().numpy()*255)
 

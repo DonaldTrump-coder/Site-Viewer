@@ -44,6 +44,7 @@ class SepDepthTrim2DGSRenderer(Renderer):
             bg_color: torch.Tensor,
             scaling_modifier=1.0,
             record_transmittance=False,
+            render_ellips = False,
             **kwargs,
     ):
         """
@@ -106,6 +107,7 @@ class SepDepthTrim2DGSRenderer(Renderer):
             scales=scales,
             rotations=rotations,
             cov3D_precomp=cov3D_precomp,
+            render_ellips=render_ellips,
         )
 
         if record_transmittance:
@@ -113,16 +115,16 @@ class SepDepthTrim2DGSRenderer(Renderer):
             transmittance = transmittance_sum / (num_covered_pixels + 1e-6)
             return transmittance
         else:
-            rendered_image, radii, allmap, weight = output
+            rendered_image, radii, allmap, _ = output
 
         # Those Gaussians that were frustum culled or had a radius of 0 were not visible.
         # They will be excluded from value updates used in the splitting criteria.
         rets = {
             "render": rendered_image,
-            "viewspace_points": screenspace_points,
-            "visibility_filter": radii > 0,
-            "radii": radii,
-            "weight": weight
+            #"viewspace_points": screenspace_points,
+            #"visibility_filter": radii > 0,
+            #"radii": radii,
+            #"weight": weight
         }
 
         # additional regularizations
@@ -130,8 +132,8 @@ class SepDepthTrim2DGSRenderer(Renderer):
 
         # get normal map
         # transform normal from view space to world space
-        render_normal = allmap[2:5]
-        render_normal = (render_normal.permute(1, 2, 0) @ (viewpoint_camera.world_to_camera[:3, :3].T)).permute(2, 0, 1)
+        #render_normal = allmap[2:5]
+        #render_normal = (render_normal.permute(1, 2, 0) @ (viewpoint_camera.#world_to_camera[:3, :3].T)).permute(2, 0, 1)
 
         # get median depth map
         render_depth_median = allmap[5:6]
@@ -143,7 +145,7 @@ class SepDepthTrim2DGSRenderer(Renderer):
         render_depth_expected = torch.nan_to_num(render_depth_expected, 0, 0)
 
         # get depth distortion map
-        render_dist = allmap[6:7]
+        #render_dist = allmap[6:7]
 
         # psedo surface attributes
         # surf depth is either median or expected by setting depth_ratio to 1 or 0
@@ -152,18 +154,18 @@ class SepDepthTrim2DGSRenderer(Renderer):
         surf_depth = render_depth_expected * (1 - self.depth_ratio) + (self.depth_ratio) * render_depth_median
 
         # assume the depth points form the 'surface' and generate psudo surface normal for regularizations.
-        surf_normal = self.depth_to_normal(viewpoint_camera, surf_depth)
-        surf_normal = surf_normal.permute(2, 0, 1)
+        #surf_normal = self.depth_to_normal(viewpoint_camera, surf_depth)
+        #surf_normal = surf_normal.permute(2, 0, 1)
         # remember to multiply with accum_alpha since render_normal is unnormalized.
-        surf_normal = surf_normal * (render_alpha).detach()
+        #surf_normal = surf_normal * (render_alpha).detach()
 
         rets.update({
-            'rend_alpha': render_alpha,
-            'rend_normal': render_normal,
-            'view_normal': -allmap[2:5],
-            'rend_dist': render_dist,
+            #'rend_alpha': render_alpha,
+            #'rend_normal': render_normal,
+            #'view_normal': -allmap[2:5],
+            #'rend_dist': render_dist,
             'surf_depth': surf_depth,
-            'surf_normal': surf_normal,
+            #'surf_normal': surf_normal,
         })
 
         return rets
