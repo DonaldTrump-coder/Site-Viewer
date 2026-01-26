@@ -1,0 +1,5 @@
+CUDA: 12.4
+conda create -n meshrendering python=3.11
+pip install torch==2.5.0 torchvision==0.20.0 torchaudio==2.5.0 --index-url https://download.pytorch.org/whl/cu124
+pip install -r requirements.txt
+pip install --no-build-isolation .

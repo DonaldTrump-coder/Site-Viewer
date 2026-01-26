@@ -1,0 +1,3 @@
+[submodule "submodules/meshing_surfel_rasterization"]
+	path = submodules/meshing_surfel_rasterization
+	url = https://github.com/DonaldTrump-coder/meshing-surfel-rasterization

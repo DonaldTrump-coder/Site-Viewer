@@ -35,3 +35,6 @@ class CKPT_Parser:
         min_p = points.min(axis=0)
         max_p = points.max(axis=0)
         return min_p, max_p
+    
+if __name__ == "__main__":
+    CKPT_Parser("./testdata/drjohnson/ckpt/epoch=26-step=6999.ckpt")

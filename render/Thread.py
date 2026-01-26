@@ -7,6 +7,7 @@ from render.cameras import get_init_camera
 import torch
 from internal.cameras.cameras import Cameras,Camera
 from internal.renderers.sep_depth_trim_2dgs_renderer import SepDepthTrim2DGSRenderer
+import math
 
 class RenderThread(QThread):
     frame_ready = pyqtSignal(np.ndarray)
@@ -92,6 +93,32 @@ class RenderThread(QThread):
     def move_back(self, step = 0.1):
         dir = self.R[2 , :]
         self.T = -self.R @ (-self.R.T@self.T - step*dir)
+
+    def turn_left(self, step=math.pi/180):
+        angle = step
+        c, s = np.cos(angle), np.sin(angle)
+        R_ = np.array([
+            [c, 0, s],
+            [0, 1, 0],
+            [-s, 0, c]
+        ])
+        R = self.R
+        self.R = R_ @ self.R
+        self.T = self.R @ (R.T @ self.T)
+
+    def turn_right(self, step=math.pi/180):
+        angle = step
+        c, s = np.cos(angle), np.sin(angle)
+        
+        R_ = np.array([
+            [c, 0, -s],
+            [0, 1, 0],
+            [s, 0, c]
+        ])
+        
+        R = self.R
+        self.R = R_ @ self.R
+        self.T = self.R @ (R.T @ self.T)
 
     def run(self):
         self.parsing_file() # parsing the file first

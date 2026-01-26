@@ -1,0 +1,9 @@
+PyQt5
+pytorch-lightning
+pytorch-lightning[cuda]
+lightning
+pybind11
+PyOpenGL
+PyOpenGL_accelerate
+opencv-python-headless
+plyfile
