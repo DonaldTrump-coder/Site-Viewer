@@ -1,9 +1,10 @@
-from PyQt5.QtWidgets import QOpenGLWidget
+from PyQt5.QtWidgets import QOpenGLWidget, QMenu, QAction, QFileDialog
 from OpenGL.GL import *
 import numpy as np
 from PyQt5.QtCore import Qt, QPointF
-from PyQt5.QtGui import QImage, QPainter
+from PyQt5.QtGui import QImage, QPainter, QIcon
 import cv2
+from PIL import Image
 
 class GLWidget(QOpenGLWidget):
     def __init__(self, parent, mainwindow):
@@ -44,6 +45,10 @@ class GLWidget(QOpenGLWidget):
         painter.end()
 
     def keyPressEvent(self, event):
+        if self.main_window.renderthread is None:
+            return
+        if self.main_window.renderthread.R is None or self.main_window.renderthread.T is None:
+            return
         if event.key() == Qt.Key_D:
             self.main_window.renderthread.move_right()
         if event.key() == Qt.Key_W:
@@ -56,14 +61,47 @@ class GLWidget(QOpenGLWidget):
     def mousePressEvent(self, event):
         self.setFocus()
         if event.button() == Qt.LeftButton:
+            if self.main_window.renderthread is None:
+                return
+            if self.main_window.renderthread.R is None or self.main_window.renderthread.T is None:
+                return
             self.last_pos = QPointF()
+        elif event.button() == Qt.RightButton:
+            self.show_saving_button(event.pos())
 
     def mouseMoveEvent(self, event):
+        if self.main_window.renderthread is None:
+            return
+        if self.main_window.renderthread.R is None or self.main_window.renderthread.T is None:
+            return
         if event.buttons() & Qt.LeftButton:
             dir = event.pos() - self.last_pos
             self.last_pos = event.pos()
             self.main_window.renderthread.rotate_in_dir(np.array([dir.x(), dir.y()]))
 
     def mouseReleaseEvent(self, event):
+        if self.main_window.renderthread is None:
+            return
+        if self.main_window.renderthread.R is None or self.main_window.renderthread.T is None:
+            return
         if event.button() == Qt.LeftButton:
             self.last_pos = QPointF()
+
+    def show_saving_button(self, pos):
+        saving_menu = QMenu(self)
+        save_action = QAction("save image", self)
+        save_action.triggered.connect(self.save_image)
+        save_action.setIcon(QIcon("resources/save.png"))
+        saving_menu.addAction(save_action)
+        saving_menu.popup(self.mapToGlobal(pos))
+
+    def save_image(self):
+        if self.image is None:
+            return
+        file_dialog = QFileDialog()
+        file_path, _ = file_dialog.getSaveFileName(self, "Save Image", "", "PNG Files (*.png);;JPEG Files (*.jpg *.jpeg);;All Files (*)")
+        if file_path:
+            img = np.transpose(self.image, (1, 2, 0))
+            img = np.flipud(img).astype(np.uint8)
+            img = Image.fromarray(img)
+            img.save(file_path)

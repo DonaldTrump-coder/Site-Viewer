@@ -58,6 +58,8 @@ class MainWindow(QMainWindow):
                                                    "",
                                                    "PointCloudFile (*.ply *.pcd *.obj);;2DGS CheckPoint (*.ckpt);;All (*)")
         if file_path:
+            if self.renderthread is not None:
+                self.renderthread.stop()
             self.renderthread = RenderThread(file_path)
             self.renderthread.frame_ready.connect(self.glwidget.set_image)
             self.renderthread.start()
