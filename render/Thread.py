@@ -8,6 +8,7 @@ import torch
 from internal.cameras.cameras import Cameras,Camera
 from internal.renderers.sep_depth_trim_2dgs_renderer import SepDepthTrim2DGSRenderer
 import math
+from matplotlib import cm
 
 class RenderThread(QThread):
     frame_ready = pyqtSignal(np.ndarray)
@@ -31,6 +32,8 @@ class RenderThread(QThread):
         self.cx = self.W / 2
         self.cy = self.H / 2
         self.times = 0
+
+        self.colormap = cm.viridis
 
     def parsing_file(self):
         # parsing file:
@@ -207,8 +210,14 @@ class RenderThread(QThread):
                 camera[0].idx.to(torch.device("cuda"))
                 camera[0].to_device(torch.device("cuda"))
                 render_pkg = self.renderer(camera[0], self.model, self.bg_color)
-                rgb = render_pkg['render']
-                self.frame_ready.emit(rgb.detach().cpu().numpy()*255)
+                if self.rendering_mode is Rendering_mode.CKPT_RGB:
+                    rgb = render_pkg['render']
+                    self.frame_ready.emit(rgb.detach().cpu().numpy()*255)
+                else:
+                    depth = render_pkg['surf_depth'].detach().cpu().numpy()
+                    depth = depth.squeeze(0)
+                    depth = self.colormap(depth / np.max(depth))
+                    self.frame_ready.emit(np.transpose(depth[:, :, :3]*255, (2, 0, 1)))
             if self.rendering_mode is Rendering_mode.CKPT_GS:
                 self.Rs[0] = torch.tensor(self.R,device=torch.device("cuda"))
                 self.Ts[0] = torch.tensor(self.T,device=torch.device("cuda"))

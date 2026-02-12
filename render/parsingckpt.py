@@ -11,6 +11,13 @@ class CKPT_Parser:
                                 device=device)
         self.model.freeze()
         self.model.pre_activate_all_properties()
+        means, opacities, scales, rotations, shs = self.get_params()
+        too_large_indices = np.any(scales > 5, axis=1)
+        self.model.gaussians["scales"] = torch.tensor(scales[~too_large_indices], device=device)
+        self.model.gaussians["means"] = torch.tensor(means[~too_large_indices], device=device)
+        self.model.gaussians["opacities"] = torch.tensor(opacities[~too_large_indices], device=device)
+        self.model.gaussians["rotations"] = torch.tensor(rotations[~too_large_indices], device=device)
+        self.model.gaussians["shs"] = torch.tensor(shs[~too_large_indices], device=device)
 
     def get_model(self):
         return self.model

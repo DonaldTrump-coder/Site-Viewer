@@ -8,3 +8,4 @@ PyOpenGL_accelerate
 opencv-python-headless
 plyfile
 pillow
+matplotlib
